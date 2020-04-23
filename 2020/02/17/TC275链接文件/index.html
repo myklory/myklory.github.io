@@ -1,0 +1,102 @@
+<h2 id="自定义节"><a class="markdownIt-Anchor" href="#自定义节"></a> 自定义节</h2>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">__attribute__((section(<span class="string">".testsec"</span>))) <span class="keyword">int</span> global = <span class="number">42</span>;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">pragma</span> section <span class="meta-string">".testsec"</span></span></span><br><span class="line"><span class="keyword">int</span> global1 = <span class="number">41</span>;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">pragma</span> section</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">SECTIONS </span><br><span class="line">&#123;</span><br><span class="line">    . = <span class="number">0x80001000</span>;</span><br><span class="line">    .testsection : &#123; *(.testsec) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上面编译global到.testsection</p>
+<p>以下编译平台为hightech，编译工具为基于gcc的tricore-gcc和tricore-ld。</p>
+<h2 id="链接文件基本概念"><a class="markdownIt-Anchor" href="#链接文件基本概念"></a> 链接文件基本概念</h2>
+<h3 id="简单例子"><a class="markdownIt-Anchor" href="#简单例子"></a> 简单例子</h3>
+<p>创建一个新的链接文件ldtest1.ld，输入如下内容：</p>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">SECTIONS</span><br><span class="line">&#123;</span><br><span class="line">  . = <span class="number">0x10000000</span>;</span><br><span class="line">  .text : &#123; *(.text) &#125;</span><br><span class="line">  . = <span class="number">0x80000000</span>;</span><br><span class="line">  .data : &#123; *(.data) &#125;</span><br><span class="line">  .bss : &#123; *(.bss) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>SECTION</strong>命令用来描述输出文件的内存布局。<br />
+上面的特殊符号&quot;.“是一个定位计数器。”.&quot;默认值是0，这里第一句给它赋值为0x10000000，<br />
+第二行定义了一个输出节.text，.text表示运行代码的二进制数据会放在这里面,*(.text)表示所有的输入文件的text节，*是一个通配符，表示所有文件。<br />
+在.text定义的时候定位计数器的值是0x10000000，链接器会把.text的起始地址设为0x10000000。可以在.map中查看.text的地址。<br />
+第三行把定位计数器的值设为0x80000000<br />
+第四行第五行定义了两个新的输出节.data,.bss，链接器会把.data放到0x80000000，.data处理完成后，定位计数器的值会就是0x80000000加上.data的长度，然后链接器会把.bss放在这个地址。<br />
+链接器必要时会通过增加定位计数器的值保证每一个输出节具有它所需要的对齐。<br />
+链接器必要时会在两个输出节之间插入空字节以保证字节对齐。比如tricore默认是64位对齐,如果定位计数器不满足64位对齐，在开始下一节时会补齐。</p>
+<h3 id="命令"><a class="markdownIt-Anchor" href="#命令"></a> 命令</h3>
+<ul>
+<li>入口点</li>
+<li>文件处理</li>
+</ul>
+<h4 id="入口点"><a class="markdownIt-Anchor" href="#入口点"></a> 入口点</h4>
+<p>在运行程序时第一个执行的指令叫入口点。<br />
+可以使用<strong>ENTRY</strong>命令来设置入口点，参数是一个符号名，通常是main或者start,如ENTRY(main)，ENTRY(start)，表示从符号main和start开始执行，即我们通常的main函数。<br />
+链接器尝试不同的方式设置入口点，如果成功了就停止：</p>
+<ul>
+<li>-e命令行选项</li>
+<li>ENTYR命令</li>
+<li>如果定义了start,，就是start的值</li>
+<li>.text节的首地址</li>
+<li>地址0<br />
+有了程序入口点，我们就可以改造上面的ldtest1.ld文件</li>
+</ul>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">ENTRY(main) <span class="comment">/* 入口点为main函数 */</span></span><br><span class="line">SECTIONS</span><br><span class="line">&#123;</span><br><span class="line">  . = <span class="number">0x10000000</span>;</span><br><span class="line">  .text : &#123; *(.text) &#125;</span><br><span class="line">  . = <span class="number">0x80000000</span>;</span><br><span class="line">  .data : &#123; *(.data) &#125;</span><br><span class="line">  .bss : &#123; *(.bss) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>main.c文件：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">/* .data */</span></span><br><span class="line"><span class="keyword">int</span> dataA = <span class="number">1</span>;</span><br><span class="line"><span class="keyword">int</span> dataB = <span class="number">2</span>;</span><br><span class="line"><span class="comment">/* .bss */</span></span><br><span class="line"><span class="keyword">int</span> bssA;</span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    dataA++; </span><br><span class="line">    dataB++;</span><br><span class="line">    bssA = <span class="number">2</span>;</span><br><span class="line">    bssA++;</span><br><span class="line">    <span class="keyword">return</span> bssA;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编译链接之后查看.map文件</p>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">.text           memory region -&gt; *<span class="section">default</span>*</span><br><span class="line">                <span class="number">0x0000000010000000</span>       <span class="number">0x6e</span></span><br><span class="line"> *(.text)</span><br><span class="line"> .text          <span class="number">0x0000000010000000</span>       <span class="number">0x6e</span> CMakeFiles/LCTest.elf.dir/src/main.c.obj</span><br><span class="line">                <span class="number">0x0000000010000000</span>                main</span><br><span class="line">                <span class="number">0x0000000080000000</span>                . = <span class="number">0x80000000</span></span><br><span class="line"></span><br><span class="line">.data           memory region -&gt; *<span class="section">default</span>*</span><br><span class="line">                <span class="number">0x0000000080000000</span>        <span class="number">0x8</span></span><br><span class="line"> *(.data)</span><br><span class="line"> .data          <span class="number">0x0000000080000000</span>        <span class="number">0x8</span> CMakeFiles/LCTest.elf.dir/src/main.c.obj</span><br><span class="line">                <span class="number">0x0000000080000000</span>                dataA</span><br><span class="line">                <span class="number">0x0000000080000004</span>                dataB</span><br><span class="line"></span><br><span class="line">.bss            memory region -&gt; *<span class="section">default</span>*</span><br><span class="line">                <span class="number">0x0000000080000008</span>        <span class="number">0x8</span></span><br><span class="line"> *(.bss)</span><br><span class="line"> .bss           <span class="number">0x0000000080000008</span>        <span class="number">0x8</span> CMakeFiles/LCTest.elf.dir/src/main.c.obj</span><br><span class="line">                <span class="number">0x0000000080000008</span>                bssA</span><br><span class="line">                <span class="number">0x00000000d0000000</span>                . = <span class="number">0xd0000000</span></span><br></pre></td></tr></table></figure>
+<p>可以看出，.text，.data，.bss节的地址和上面的分析一样。</p>
+<h4 id="文件处理"><a class="markdownIt-Anchor" href="#文件处理"></a> 文件处理</h4>
+<p>文件处理用来指明要链接的文件，或者链接输出的文件名。通常在命令行中指定，脚本文件中暂时略过</p>
+<h3 id="符号"><a class="markdownIt-Anchor" href="#符号"></a> 符号</h3>
+<p>可以在链接脚本中为一个符号赋值，这会把这个符号定义为一个全局符号。<br />
+可以通过对一个符号执行下面的运算：</p>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">symbol = expression ;</span><br><span class="line">symbol += expression ;</span><br><span class="line">symbol -= expression ;</span><br><span class="line">symbol *= expression ;</span><br><span class="line">symbol /= expression ;</span><br><span class="line">symbol &lt;&lt;= expression ;</span><br><span class="line">symbol &gt;&gt;= expression ;</span><br><span class="line">symbol &amp;= expression ;</span><br><span class="line">symbol |= expression ;</span><br></pre></td></tr></table></figure>
+<p>第一行定义一个符号同时赋值为expression。<br />
+余下的行执行符号的计算操作，符号必须是已经定义的。<br />
+特殊符号&quot;.&quot;只能在SECTION命令中使用它。<br />
+表达式必须以分号结尾。<br />
+例子：</p>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">floating_point = <span class="number">0</span>;</span><br><span class="line">SECTIONS</span><br><span class="line">&#123;</span><br><span class="line">  .text :</span><br><span class="line">    &#123;</span><br><span class="line">      *(.text)</span><br><span class="line">      _etext = .;</span><br><span class="line">    &#125;</span><br><span class="line">  _bdata = (. + <span class="number">3</span>) &amp; ~ <span class="number">3</span>;</span><br><span class="line">  .data : &#123; *(.data) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>floating_point为0，<br />
+_etext的值是.text节尾部的地址，即当前&quot;.&quot;的地址，<br />
+_bdata是.text后面一个向上对齐到4字节边界的地址。</p>
+<h4 id="hidden"><a class="markdownIt-Anchor" href="#hidden"></a> HIDDEN</h4>
+<p>在elf文件中，如果不想定义的符号被导出到目标文件，可以使用HIDDEN符号，如<br />
+HIDDEN(_extext)即不导出_extext符号。</p>
+<h4 id="provide"><a class="markdownIt-Anchor" href="#provide"></a> PROVIDE</h4>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">SECTIONS</span><br><span class="line">&#123;</span><br><span class="line">  .text :</span><br><span class="line">    &#123;</span><br><span class="line">      *(.text)</span><br><span class="line">      _etext = .;</span><br><span class="line">      PROVIDE(etext = .);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果在程序中定义了一个_etext符号，链接器会给出一个错误，因为在脚本文件中又定义了这个符号，如果程序中定义了一个etext符号，链接器会默认使用程序中的定义。如果程序中引用了etext但不定义它，链接器会使用脚本中的定义。</p>
+<h4 id="provide-hidden"><a class="markdownIt-Anchor" href="#provide-hidden"></a> PROVIDE-HIDDEN</h4>
+<p>和PROVIDE一样，在elf文件中不会导出这个符号。</p>
+<h4 id="在源码中引用符号"><a class="markdownIt-Anchor" href="#在源码中引用符号"></a> 在源码中引用符号</h4>
+<p>在脚本文件中定义了一个符号etext=0x10000000,可以在源码中引用它，extern int etext。但是这里etext指向的值是一个地址，即etext是一个void类型的指针，要使用它，需要注意进行转换，同时应该留有足够大小的空间如</p>
+<figure class="highlight ini"><table><tr><td class="code"><pre><span class="line"><span class="attr">etext</span>=<span class="number">0</span>x10000000<span class="comment">;</span></span><br><span class="line"><span class="attr">etext_size</span>=<span class="number">2</span>K<span class="comment">;</span></span><br></pre></td></tr></table></figure>
+<p>即可使用etext引用2K大小的数据。</p>
+<h3 id="sections"><a class="markdownIt-Anchor" href="#sections"></a> SECTIONS</h3>
+<p>SECTIONS命令的基本格式如下：</p>
+<figure class="highlight puppet"><table><tr><td class="code"><pre><span class="line">SECTIONS</span><br><span class="line">&#123;</span><br><span class="line">  sections-command</span><br><span class="line">  sections-command</span><br><span class="line">  …</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>每一个sections-command可以是下面的一种</p>
+<ul>
+<li>一个ENTRY命令</li>
+<li>一个符号赋值</li>
+<li>一个输出节描述</li>
+<li>一个重叠描述</li>
+</ul>
+<h4 id="输出节描述"><a class="markdownIt-Anchor" href="#输出节描述"></a> 输出节描述</h4>
+<p>完整的输出节描述如下：</p>
+<figure class="highlight less"><table><tr><td class="code"><pre><span class="line"><span class="selector-tag">section</span> <span class="selector-attr">[address]</span> <span class="selector-attr">[(type)]</span> :</span><br><span class="line">  <span class="selector-attr">[AT(lma)]</span></span><br><span class="line">  <span class="selector-attr">[ALIGN(section_align) | ALIGN_WITH_INPUT]</span></span><br><span class="line">  <span class="selector-attr">[SUBALIGN(subsection_align)]</span></span><br><span class="line">  <span class="selector-attr">[constraint]</span></span><br><span class="line">  &#123;</span><br><span class="line">    <span class="selector-tag">output-section-command</span></span><br><span class="line">    <span class="selector-tag">output-section-command</span></span><br><span class="line">    …</span><br><span class="line">  &#125; <span class="selector-attr">[&gt;region]</span> <span class="selector-attr">[AT&gt;lma_region]</span> <span class="selector-attr">[:phdr :phdr …]</span> <span class="selector-attr">[=fillexp]</span> <span class="selector-attr">[,]</span></span><br></pre></td></tr></table></figure>
+<p>一个输出节不需要完整包含所有的描述。<br />
+每一个output-section-command可以是下面的一种：</p>
+<ul>
+<li>一个符号赋值</li>
+<li>一个输入节描述</li>
+<li>直接包含的数据值</li>
+<li>一个特定输出节的关键字</li>
+</ul>
+<h4 id="输出节名"><a class="markdownIt-Anchor" href="#输出节名"></a> 输出节名</h4>
+<p>上面的section不是命令SECTIONS，这里的section是节的名字，常见的节名有.text,.data,.bss等。</p>
+<h4 id="输出地址"><a class="markdownIt-Anchor" href="#输出地址"></a> 输出地址</h4>
+<p>如果提供了address，输出节的地址会精确的设置为这个地址<br />
+如果没有提供address，会使用region的地址<br />
+如果没有address,也没有region，会使用定位计数器的值（会对齐）<br />
+指定一个节的地址会改变定位计数器的值。<br />
+address可以是任意的表达式，比如</p>
+<figure class="highlight arduino"><table><tr><td class="code"><pre><span class="line">.<span class="built_in">text</span> . :&#123;*&#123;.<span class="built_in">text</span>&#125;&#125; <span class="comment">/* 使用定位计数器为address */</span></span><br><span class="line">.<span class="function"><span class="built_in">text</span> <span class="title">ALIGN</span><span class="params">(<span class="number">8</span>)</span> : </span>&#123;*&#123;.<span class="built_in">text</span>&#125;&#125; <span class="comment">/* 使用定位计数器8字节对齐之后为address */</span></span><br></pre></td></tr></table></figure>
+<h4 id="输出节"><a class="markdownIt-Anchor" href="#输出节"></a> 输出节</h4>
+<h4 id="输入节"><a class="markdownIt-Anchor" href="#输入节"></a> 输入节</h4>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">__attribute__((section(<span class="string">".testsec"</span>))) <span class="keyword">int</span> global = <span class="number">42</span>;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">pragma</span> section <span class="meta-string">".testsec"</span></span></span><br><span class="line"><span class="keyword">int</span> global1 = <span class="number">41</span>;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">pragma</span> section</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight lsl"><table><tr><td class="code"><pre><span class="line">SECTIONS </span><br><span class="line">&#123;</span><br><span class="line">    . = <span class="number">0x80001000</span>;</span><br><span class="line">    .testsection : &#123; *(.testsec) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>上面编译global，global1到.testsection，其中testsection是输出节，.testsec是输入节</p>
